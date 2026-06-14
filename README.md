@@ -1,9 +1,9 @@
-# White-Box MLP Estimation — Cumulant Propagation (NumPy/flopscope port)
+# White-Box MLP Estimation: Cumulant Propagation (NumPy/flopscope port)
 
 An independent, dependency-light **NumPy / `flopscope.numpy` reimplementation**
 of the Alignment Research Center's *cumulant propagation* (`kprop`) method for
 analytically estimating the expected post-ReLU activations of a wide random MLP
-— without sampling. Built for the
+without sampling. Built for the
 [ARC White-Box Estimation Challenge 2026](https://www.alignment.org/blog/announcing-the-arc-white-box-estimation-challenge/)
 (WhestBench, AIcrowd).
 
@@ -21,7 +21,7 @@ on the challenge's analytical FLOP-counting backend `flopscope.numpy`.
 - **Bit-exact to the PyTorch reference**: max abs difference `<= 1e-12` across all
   ported modules (see `port_np/verify_*.py`).
 - **k_max=3 (SIMPLE, factored)**: final-layer MSE ~`1.2e-6` at ~`1.7e10`
-  analytical FLOPs — ~17x lower error than the covariance (k=2) baseline.
+  analytical FLOPs, ~17x lower error than the covariance (k=2) baseline.
 - Runs under the grader's constrained backend (no raw `numpy`, FLOP budget,
   symmetry-tracked tensors). See `RESULTS.md` and the report for the negative
   results (energy-compression and skew shortcuts that do **not** work) and the
@@ -78,4 +78,4 @@ not affiliated with ARC. Licensed MIT to match the reference.
 
 ## Author
 
-Pavan Kumar Dubasi — [github.com/ascender1729](https://github.com/ascender1729)
+Pavan Kumar Dubasi, [github.com/ascender1729](https://github.com/ascender1729)
