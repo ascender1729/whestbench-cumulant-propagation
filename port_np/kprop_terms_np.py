@@ -17,7 +17,7 @@ from typing import Optional
 
 import numpy as np
 
-from port_np._backend import wrapped_multiply
+from port_np._backend import wrapped_multiply, wrapped_einsum
 from port_np.partitions_np import (
     IntPartCond,
     IntPartition,
@@ -112,9 +112,10 @@ def multiply_wicks(
     d = len(k)
     assert d == K_part.ndim
     assert d == len(p)
-    for axis, (k_i, p_i) in enumerate(zip(k, p)):
-        wick_coef = wick_lookup(int(k_i), int(p_i))
-        view_shape = [1] * d
-        view_shape[axis] = -1
-        K_part = wrapped_multiply(K_part, wick_coef.reshape(view_shape))
-    return K_part
+    # K_part[I] * prod_axis wick_coef_axis[i_axis] is a separable per-axis scaling.
+    # The old loop did d broadcast-multiplies + d reshapes (2d flopscope calls);
+    # one einsum 'ijk,i,j,k->ijk' is identical and a single call.
+    coefs = [wick_lookup(int(k[a]), int(p[a])) for a in range(d)]
+    letters = "abcdefghijklmnop"[:d]
+    expr = letters + "," + ",".join(letters) + "->" + letters
+    return wrapped_einsum(expr, K_part, *coefs)

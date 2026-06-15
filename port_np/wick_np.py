@@ -91,7 +91,8 @@ def _he_coef(n):
 
 def He(n, x):
     # probabilists' Hermite He_n evaluated on data via recurrence
-    x = np.asarray(x, dtype=np.float64)
+    if not hasattr(x, "ndim"):
+        x = np.asarray(x, dtype=np.float64)  # skip the wasted fnp call when x is already an array
     if n == 0:
         return np.ones_like(x)
     if n == 1:
@@ -110,7 +111,8 @@ def He_poly(n):
 
 
 def eval_poly(poly, x):
-    x = np.asarray(x, dtype=np.float64)
+    if not hasattr(x, "ndim"):
+        x = np.asarray(x, dtype=np.float64)  # skip the wasted fnp call when x is already an array
     y = np.zeros_like(x)
     for ck in poly.coef[::-1]:
         y = y * x + ck
@@ -138,20 +140,26 @@ def _relu_wick_poly(p, k):
     return binom(inner_1), binom(inner_2)
 
 
-def relu_wick_coef(mean, var, k, p=1):
-    mean = np.asarray(mean, dtype=np.float64)
-    var = np.asarray(var, dtype=np.float64)
-    # np.clip delegates to numpy._core.fromnumeric.clip at call time; under the
-    # grader's numpy-shim (sys.modules["numpy"]=flopscope.numpy) that lazy import
-    # resolves to fnp and dies. np.maximum is a native flopscope ufunc -> safe.
-    var = np.maximum(var, 1e-10)
-    sigma = np.sqrt(var)
-    alpha = mean / sigma
+def relu_wick_coef(mean, var, k, p=1, _setup=None):
+    # _setup=(mean, var, sigma, alpha) lets the caller hoist this shared setup out
+    # of the per-(k,p) loop (sigma/alpha are constant per layer). Recomputing it
+    # per call cost ~5 flopscope ops each (asarray x2, maximum, sqrt, divide).
+    if _setup is None:
+        mean = np.asarray(mean, dtype=np.float64)
+        # np.clip delegates to numpy._core.fromnumeric.clip at call time; under the
+        # grader's numpy-shim (sys.modules["numpy"]=flopscope.numpy) that lazy import
+        # resolves to fnp and dies. np.maximum is a native flopscope ufunc -> safe.
+        var = np.maximum(np.asarray(var, dtype=np.float64), 1e-10)
+        sigma = np.sqrt(var)
+        alpha = mean / sigma
+        _setup = (mean, var, sigma, alpha)
+    else:
+        mean, var, sigma, alpha = _setup
     if k < p:
         P1, P2 = _relu_wick_poly(p, k)
         return sigma ** (p - k) * (eval_poly(P1, alpha) * norm_pdf(alpha) + eval_poly(P2, alpha) * norm_cdf(alpha))
     elif p > 1:
-        return math.factorial(p) * relu_wick_coef(mean, var, k - p + 1, 1)
+        return math.factorial(p) * relu_wick_coef(mean, var, k - p + 1, 1, _setup=_setup)
     else:
         if k == 0:
             return sigma * norm_pdf(alpha) + mean * norm_cdf(alpha)

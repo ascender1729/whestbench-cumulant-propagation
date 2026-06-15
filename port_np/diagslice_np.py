@@ -131,7 +131,8 @@ def _zero_repeated(A):
     in-place strided-view semantics are preserved for all callers because every
     caller that relied on in-place mutation now consumes the returned value.
     """
-    A = np.asarray(A)
+    if not hasattr(A, "ndim"):
+        A = np.asarray(A)  # only coerce non-arrays; np.asarray(fnp) is a wasted fnp call
     if A.ndim <= 1:
         return A
     n = A.shape[0]
@@ -578,7 +579,10 @@ class DSTensor:
         if sorted_part not in self.slices:
             # Return (1,)*len(part) zeros tensor and let broadcasting handle it
             return np.zeros((1,) * len(part), dtype=self.dtype)
-        return np.transpose(self.slices[sorted_part], permutation)
+        sl = self.slices[sorted_part]
+        if permutation == list(range(len(permutation))):
+            return sl  # identity permutation: transpose is a no-op (saves a fnp call)
+        return np.transpose(sl, permutation)
 
     def get_dslice(self, part):
         """

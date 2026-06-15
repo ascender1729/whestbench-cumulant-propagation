@@ -36,6 +36,7 @@ from port_np._backend import (
     wrapped_copy,
     wrapped_matmul,
     wrapped_multiply,
+    wrapped_einsum,
 )
 from port_np.tensor_utils_np import cached_einsum, flop_name, symmetrize
 from port_np.diagslice_np import (
@@ -362,11 +363,18 @@ def factored_nonlin_kprop_k3(
         assert mean.ndim == 1, "Mean must be a vector."
         assert var.ndim == 1, "Variance must be a vector."
 
-    # 3.0 Setup for nonlinearity
+    # 3.0 Setup for nonlinearity. Hoist the (mean,var)->(sigma,alpha) setup out
+    # of the per-(k,p) loop: it is constant per layer, and recomputing it inside
+    # every get_wick_coef cost ~5 flopscope calls each.
+    _var_c = np.maximum(np.asarray(var, dtype=np.float64), 1e-10)
+    _sigma = np.sqrt(_var_c)
+    _mean_c = np.asarray(mean, dtype=np.float64)
+    _wick_setup = (_mean_c, _var_c, _sigma, _mean_c / _sigma)
+
     @cache
     @flop_name('get_wick_coef')
     def get_wick_coef(k: int, p: int):
-        return nonlin_wick_coef(mean=mean, var=var, k=k, p=p)
+        return nonlin_wick_coef(mean=_mean_c, var=_var_c, k=k, p=p, _setup=_wick_setup)
 
     pK_slices = defaultdict(lambda: 0.)
 
