@@ -122,12 +122,12 @@ def _np_erf(x):
 
 def norm_pdf(x):
     if use_flopscope:
-        return np.asarray(_flops.stats.norm.pdf(_fnp.asarray(x)))
+        return _flops.stats.norm.pdf(x)  # coerces + returns fnp; asarray wraps were wasted calls
     return np.exp(-0.5 * np.asarray(x, dtype=np.float64) ** 2) * _INV_SQRT_2PI
 
 
 def norm_cdf(x):
     if use_flopscope:
-        return np.asarray(_flops.stats.norm.cdf(_fnp.asarray(x)))
+        return _flops.stats.norm.cdf(x)
     x = np.asarray(x, dtype=np.float64)
     return 0.5 * (1.0 + _np_erf(x / _SQRT2))
