@@ -152,21 +152,34 @@ def relu_wick_coef(mean, var, k, p=1, _setup=None):
         var = np.maximum(np.asarray(var, dtype=np.float64), 1e-10)
         sigma = np.sqrt(var)
         alpha = mean / sigma
-        _setup = (mean, var, sigma, alpha)
-    else:
+        cache = {}
+        _setup = (mean, var, sigma, alpha, cache)
+    elif len(_setup) == 5:
+        mean, var, sigma, alpha, cache = _setup
+    else:  # backward-compat 4-tuple
         mean, var, sigma, alpha = _setup
+        cache = {}
+    # norm_pdf(alpha)/norm_cdf(alpha) are constant per layer (alpha fixed) but were
+    # recomputed in every distinct (k,p) wick call (~900 _erf/pdf fnp calls / run).
+    # The cache lives in _wick_setup (one per layer), so all get_wick_coef(k,p) share it.
+    pdf_a = cache.get("pdf")
+    if pdf_a is None:
+        pdf_a = norm_pdf(alpha); cache["pdf"] = pdf_a
+    cdf_a = cache.get("cdf")
+    if cdf_a is None:
+        cdf_a = norm_cdf(alpha); cache["cdf"] = cdf_a
     if k < p:
         P1, P2 = _relu_wick_poly(p, k)
-        return sigma ** (p - k) * (eval_poly(P1, alpha) * norm_pdf(alpha) + eval_poly(P2, alpha) * norm_cdf(alpha))
+        return sigma ** (p - k) * (eval_poly(P1, alpha) * pdf_a + eval_poly(P2, alpha) * cdf_a)
     elif p > 1:
         return math.factorial(p) * relu_wick_coef(mean, var, k - p + 1, 1, _setup=_setup)
     else:
         if k == 0:
-            return sigma * norm_pdf(alpha) + mean * norm_cdf(alpha)
+            return sigma * pdf_a + mean * cdf_a
         elif k == 1:
-            return norm_cdf(alpha)
+            return cdf_a
         else:
-            return (-1) ** (k - 2) * sigma ** (-(k - 1)) * He(k - 2, alpha) * norm_pdf(alpha)
+            return (-1) ** (k - 2) * sigma ** (-(k - 1)) * He(k - 2, alpha) * pdf_a
 
 
 if __name__ == "__main__":

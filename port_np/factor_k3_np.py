@@ -369,7 +369,7 @@ def factored_nonlin_kprop_k3(
     _var_c = np.maximum(np.asarray(var, dtype=np.float64), 1e-10)
     _sigma = np.sqrt(_var_c)
     _mean_c = np.asarray(mean, dtype=np.float64)
-    _wick_setup = (_mean_c, _var_c, _sigma, _mean_c / _sigma)
+    _wick_setup = (_mean_c, _var_c, _sigma, _mean_c / _sigma, {})
 
     @cache
     @flop_name('get_wick_coef')

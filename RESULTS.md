@@ -71,3 +71,34 @@ prizes $50k/$20k/$10k + $20k algorithmic. 50 submissions/team/day.
   keep the telescoping CV as an unbiased wrapper around ANY mech core.
 - Consider Lambda/AWS for wide hyperparameter sweeps over the full 100-MLP
   mini split (local 20-MLP runs take ~1-3 min each).
+
+## Confirmed live-grader submissions (cumulant propagation, k_max=3)
+
+Scored on the full warm-up benchmark via AIcrowd. Adjusted score = final-layer
+MSE x max(0.1, effective_compute / 6.8e10), lower is better.
+
+| Estimator | analytical FLOPs | adjusted score | notes |
+|---|---|---|---|
+| covariance fallback | ~5e8 | 3.6e-6 | floor multiplier, cheap but biased |
+| kprop k3 (SIMPLE, factored) | 1.71e10 | 7.53e-7 | 5x better than covariance |
+| kprop k3, fnp-call optimized | 1.71e10 | 7.28e-7 | pdf/cdf per-layer cache (calls 18.6k to 9.5k, bit-exact) |
+| kprop k3 + k4 extrapolation | 1.76e10 | **6.65e-7** | Aitken-style final-layer correction |
+
+Notes:
+1. On the grading hardware the residual (Python wall time) is negligible: a
+   48.7% fnp-call reduction left the adjusted score unchanged, so the
+   multiplier is set by analytical FLOPs (1.71e10 / 6.8e10 = 0.25), not wall
+   time. Local wall-time estimates overstate the residual.
+2. The k4 extrapolation corrects the scored final-layer mean using the
+   k2 to k3 trajectory: E_corrected = E_k3 + c (E_k3 - E_k2). The k3 residual
+   versus ground truth consistently tracks the k2 to k3 step (correlation about
+   -0.35 at width 256 across nets), so a small negative c extrapolates toward
+   the k4 limit. The coefficient is leave-one-net-out cross-validated at width
+   256 (c star = -0.0735, about 15.7% final-layer MSE reduction; deployed at a
+   shrunk c = -0.065 for transfer safety). It needs one extra k_max=2
+   propagation (about 5e8 FLOPs) and is applied only to the final scored layer,
+   with a fail-safe fallback to plain k3.
+3. The cumulant tensors at every layer are close to full rank, so low-rank or
+   diagonal-only propagation cannot reduce the contraction cost without
+   destroying the mean. The remaining accuracy gap is the high-dimensional k4
+   contribution, which needs the full fourth-cumulant tensor.
